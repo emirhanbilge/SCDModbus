@@ -54,20 +54,11 @@ def notification_handler(sender, data):
         print("************** " ,len(allNotifiy) ," Total Counter   Sağdaki paket sayısı" ,int.from_bytes(bytearray(allNotifiy[0])[4:8] , "little") )
         print("Download is successfully")
 
-import numpy as np
+
 def notificationHandlerResult(sender, data):
  
     print(data)
     liveResult = bytearray(data)
-    """
-    intmy = int(s16floatfactor(liveResult[0:2],1))
-
-    
-    print( int(s16floatfactor(liveResult[0:2],1)) ,"  ************** " ,s16floatfactor(liveResult[0:2],1) )
-    
-   
-    """
-   
     sendModBus = []
     i1 = (int(s16floatfactor(liveResult[0:2],1000)))
     i2 = (int(s16floatfactor(liveResult[2:4],1000)))
@@ -75,10 +66,7 @@ def notificationHandlerResult(sender, data):
     sendModBus.append(i1)
     sendModBus.append(i2)
     sendModBus.append(i3)
-    #tmp = np.array([i1,i2,i3] , np.int16)
-    #sendModBus = tmp
-    
-    #generate_mdbs_values(sendModBus)
+    generate_mdbs_values(sendModBus)
     
 ##########################################################################    DATA SAVE    ##############################################################
 
@@ -188,7 +176,6 @@ async def getSTEResultNotify():
     await client.start_notify(ServiceShortTermExperiment["STEResults"], notificationHandlerResult)
     await asyncio.sleep(10.0)
     await client.stop_notify(ServiceShortTermExperiment["STEResults"])
-    await asyncio.sleep(1.0)
 
 async def getSTEResultNotifyWithNoTime():
     await client.start_notify(ServiceShortTermExperiment["STEResults"], notificationHandlerResult)
@@ -374,53 +361,33 @@ async def testPeriodic():
         await connect()
         global allNotifiy
         allNotifiy= []
-        
         print("Erase memory")
         await deleteFlashMemory()
         await disconnect()
-       
         await connectWithCheck()
-        
         await stopToggle()
-        
-        await setSensorsEnables(b'\xf0')
-        await setSensorsEnables(b'\x01')
-        await setOutputDataRates(b'\x01')
-        await setSensorRawValueToFlash(b'\xf0')
-        print("************************************ 1" , await getAllSTEConfig() )
-        await startToggle()
-        for i in range(100):
-            print(await getSTEResultRead())
-        #await getSTEResultNotify()
-        #await asyncio.sleep(1)
-        await stopToggle()
-        
-        print("************************************ 2" , await getAllSTEConfig() )
         await setSensorsEnables(b'\xf0')
         await setSensorsEnables(b'\x01')
         await setOutputDataRates(b'\x00')
-        
         await setSensorRawValueToFlash(b'\xf1')
         print("Sensör start recording")
-       
-        
         await startToggle()
         startDTime = time.localtime(time.time())
         time.sleep(5)
         print("Sensör stop recording")
-        #await client.stop_notify(ServiceShortTermExperiment["STEResults"])
         await stopToggle()
         stopDTime = time.localtime(time.time())
         print("Total geçen zaman : dakika " ,(stopDTime.tm_min- startDTime.tm_min) , (stopDTime.tm_sec- startDTime.tm_sec))
         await disconnect()
-        
-        
         await connectWithCheck()
         print("Download is starting")
         await getDataFlowNotify()
         await disconnect()
-        
-        #writeDownload()
+        print("Result Notify Başlıyacak")
+        await startToggle()
+        await getSTEResultNotify()
+        await stopToggle()
+        await startToggle()
         print("All task is successfully")
     except:
         controlF = await checkDevice()
