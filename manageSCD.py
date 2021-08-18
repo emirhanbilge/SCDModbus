@@ -388,6 +388,7 @@ async def testPeriodic():
         await getSTEResultNotify()
         await stopToggle()
         await startToggle()
+        await disconnect()
         print("All task is successfully")
     except:
         controlF = await checkDevice()
