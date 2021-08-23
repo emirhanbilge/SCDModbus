@@ -1,12 +1,4 @@
-#!/usr/bin/env python
-"""
-Pymodbus Asynchronous Server Example
-pip install twisted
-pip install pymodbus
-"""
-
-
-import sys , time 
+import sys
 sys.path.append('../')
 
 # --------------------------------------------------------------------------- # 
@@ -35,32 +27,58 @@ log.setLevel(logging.CRITICAL)
 
 def updating_writer(a):
 
-    #log.debug("updating the context")
     context  = a[0]
     register = 3 # mode 3
     slave_id = 0x00
     address  = 0x10 #16. word adresi
-    #values   = context[slave_id].getValues(register, address, count=5)
-    #values   = [v + 1 for v in values]
-    values   = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24]  
-    #log.debug("new values: " + str(values))
-    context[slave_id].setValues(register, address, values) # server da ki 16. word adresinden itibaren values dizisini yükle.
+    values   = []  
+    for i in range(1,100):
+        values.append(i)
+    
+    context[slave_id].setValues(register, address, values)
 
 def updating_custom_writer(a,values):
 
-    #log.debug("updating the custom context")
     context  = a[0]
     register = 3 # mode 3
     slave_id = 0x00
-    #address  = 0x10 #16. word adresi
-    address  = 0x00 #0. word adresi
-    #values   = context[slave_id].getValues(register, address, count=5)
-    #values   = [v + 1 for v in values]
-    #values   = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24]  
-    #log.debug("new values: " + str(values))
-    for val in values:
-        writeList = val
+    address  = 0x10 #0. word adresi  
+
     context[slave_id].setValues(register, address, values) # server da ki 16. word adresinden itibaren values dizisini yükle.
+
+def updating_settings1_writer(a,values):
+
+    context  = a[0]
+    register = 3 # mode 3
+    slave_id = 0x00
+    address  = 0x42 #0. word adresi
+
+    context[slave_id].setValues(register, address, values) # server da ki 16. word adresinden itibaren values dizisini yükle.
+
+def updating_settings2_writer(a,values):
+
+    context  = a[0]
+    register = 3 # mode 3
+    slave_id = 0x00
+    address  = 0x43 #0. word adresi
+
+    context[slave_id].setValues(register, address, values) # server da ki 16. word adresinden itibaren values dizisini yükle.
+    
+def readSettings1(a):
+
+    context  = a[0]
+    register = 3 # mode 3
+    slave_id = 0x00
+    address  = 0x00 #0. word adresi
+    return context[slave_id].getValues(register, 66, 1) # server da ki 16. word adresinden itibaren values dizisini yükle.
+
+def readSettings2(a):
+
+    context  = a[0]
+    register = 3 # mode 3
+    slave_id = 0x00
+    address  = 0x00 #0. word adresi
+    return context[slave_id].getValues(register, 67, 1) # server da ki 16. word adresinden itibaren values dizisini yükle.
 
 
 def run_async_server():
@@ -83,7 +101,7 @@ def run_async_server():
     identity.ModelName = 'Pymodbus Server'
     identity.MajorMinorRevision = version.short()
 
-    StartTcpServer(Context, identity=identity, address=("192.168.2.29", 5020),
+    StartTcpServer(Context, identity=identity, address=("192.168.2.18", 5020),
                    custom_functions=[CustomModbusRequest])
  
 if __name__ == "__main__":

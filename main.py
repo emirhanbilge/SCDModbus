@@ -5,6 +5,7 @@ import automatePairing as a
 import threading
 from modbusServer import run_async_server 
 
+
 """ Automate Pairing Thread - Start"""
 def automate_pairing():
     agent = a.Agent(a.bus, a.AGENT_PATH)
@@ -41,111 +42,3 @@ mainloop.quit()
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-"""
-startDTime = time.localtime(time.time())
-
-loop.run_until_complete(connect())
-
-loop.run_until_complete(saveDataInFlash(b'\xf1', 8 ))
-
-loop.run_until_complete(startDownload())
-finishDTime = time.localtime(time.time())
-"""
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#print("İndirme zamanı" , finishDTime.tm_min-startDTime.tm_min," dakika saniye : " ,finishDTime.tm_sec-startDTime.tm_sec )
-#startDTime = time.localtime(time.time())
-"""
-while(1):
-    startDTime = time.localtime(time.time())
-    loop.run_until_complete(connect())
-    loop.run_until_complete(saveDataInFlash(b'\xf1',20 ))
-    loop.run_until_complete(startDownload())
-    finishDTime = time.localtime(time.time())
-    print("İndirme zamanı" , finishDTime.tm_min-startDTime.tm_min," dakika saniye : " ,finishDTime.tm_sec-startDTime.tm_sec )
-    startDTime = time.localtime(time.time())
-    loop.run_until_complete(connect())
-    loop.run_until_complete(getSTEResultNotify())
-    finishDTime = time.localtime(time.time())
-    print("Canlı Yayın zamanı" , finishDTime.tm_min-startDTime.tm_min," dakika saniye : " ,finishDTime.tm_sec-startDTime.tm_sec)
-    loop.run_until_complete(disconnect())
-"""
-
-
-"""
-convertByteArr("output.txt")
-getX_Y_Z()
-print("8888888888888888")
-"""
-
-"""
-loop.run_until_complete(setSensorsEnables(b'\xff'))
-loop.run_until_complete(disconnect())
-loop.run_until_complete(connect())
-"""
-
-
-"""
-loop.run_until_complete(setSensorsEnables(b'\xff'))
-loop.run_until_complete(stopToggle())
-loop.run_until_complete(setOutputDataRates(b'\x02'))
-loop.run_until_complete(startToggle())
-print(loop.run_until_complete(getAllSTEConfig()))
-loop.run_until_complete(getSTEResultNotify())
-print(loop.run_until_complete(getAllSTEConfig()))
-loop.run_until_complete(disconnect())
-"""
-""" +-+++++++++++++++++++++++++++
-loop.run_until_complete(connect())
-
-loop.run_until_complete(testPeriodic())
-"""
-#loop.run_until_complete(startDownload())
-
-
-"""
-counter = 0
-while(1):
-    timeS = time.time()
-    
-    print( time.time()-timeS)
-"""
-"""
-print("Erase started")
-await deleteFlashMemory()
-await disconnect()
-time.sleep(9)
-await connect()
-print("Record started")
-await (setSensorRawValueToFlash(b'\xf1'))
-    #time.sleep(10)
-await startToggle()
-time.sleep(recordTime)
-await stopToggle()
-await disconnect()
-"""

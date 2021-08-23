@@ -1,46 +1,27 @@
 import asyncio , datetime
+from logging import error
 from bleak import BleakScanner , BleakClient
-import time , datetime
-import sys 
+import time , datetime , sys
 import nest_asyncio
 nest_asyncio.apply()
 sys.path.append('../')
 from scdCharacteristic import ServiceBulkDataTransfer,ServiceShortTermExperiment  ,ServiceSCDSettings
-from csvFormatter import getX_Y_Z
 import modbusServer as mdbs
 from pymodbus.constants import Endian
-from pymodbus.payload import BinaryPayloadDecoder
 from pymodbus.payload import BinaryPayloadBuilder
-from pymodbus.client.sync import ModbusTcpClient
+from convertFunctions import s16floatfactor , s32floatfactor 
+from modbusManagement import sendModBus , accelroVariance , writeSTEResultModbus ,secondSettingBlock
+ 
 
 
-def s16(value):
-    return -(value & 0x8000) | (value & 0x7fff)
-
-def s16floatfactor(value,factor):
-    temp = s16(value[0] | (value[1]<<8))
-    temp = float(temp)*factor
-    return round(temp,2)
-def generate_mdbs_values(listVal):
-         
-        builder = BinaryPayloadBuilder(byteorder=Endian.Big,wordorder=Endian.Little)
-        builder.add_16bit_int(listVal[0])    #accelArithmMean_x
-        builder.add_16bit_int(listVal[1])    #accelArithmMean_y
-        builder.add_16bit_int(listVal[2])    #accelArithmMean_z
-        
-        payload = builder.to_registers() 
-        mdbs.updating_custom_writer(a=(mdbs.Context,),values =payload)
-        
-
+            
 
 ################################################################################################################ FOR NOTIFY ###############################################################################
 allNotifiy = []
 flagStartStop =[]
-
 hundredPercent = 0
 def notification_handler(sender, data):
    
-    
     lists = []
     for i in data:
         lists.append(i)
@@ -56,38 +37,25 @@ def notification_handler(sender, data):
 
 
 def notificationHandlerResult(sender, data):
- 
-    print(data)
-    liveResult = bytearray(data)
-    sendModBus = []
-    i1 = (int(s16floatfactor(liveResult[0:2],1000)))
-    i2 = (int(s16floatfactor(liveResult[2:4],1000)))
-    i3 = (int(s16floatfactor(liveResult[4:6],1000)))
-    sendModBus.append(i1)
-    sendModBus.append(i2)
-    sendModBus.append(i3)
-    generate_mdbs_values(sendModBus)
+    writeSTEResultModbus(data)
+
+
     
 ##########################################################################    DATA SAVE    ##############################################################
 
 
 def writeDownload():
-    clearBytes = []
-    lineCounter = 0
     now = datetime.datetime.now()
     nowFileName = str(now.hour) +"."+str(now.minute)+"."+str(now.second)+"."+str(now.day)+"."+str(now.month)+"."+str(now.year)+".txt"
-    
-    getX_Y_Z(allNotifiy)
-    """
-    fileO = open(nowFileName,"a")
+    fo = open(nowFileName,"a")
+    #getX_Y_Z(allNotifiy)
     for i in allNotifiy:
-        if lineCounter > 1:
-            
-            fileO.write(str(i))
-            fileO.write("\n")
-            #print(i)
-        lineCounter +=1
-    """
+        for j in i:
+            fo.write(str(j))
+            fo.write(" ")
+        fo.write("\n")
+    fo.close()
+
 ########################################################################################################################################################
 
 
@@ -107,6 +75,11 @@ async def setModeSelection(mode):  #mode 0 : 0 değeri ; 1 ise 255 değerini yaz
         return await getModeSelection()
 async def getModeSelection():
      return await client.read_gatt_char(ServiceSCDSettings["ModeSelection"])
+
+
+async def selfTest():
+    return await client.read_gatt_char(ServiceSCDSettings["SelfTestResult"])
+    
 #####################################################################################################################################
 
 
@@ -131,6 +104,11 @@ async def stopToggle():
     if (vr)[32] != 0:
         await client.write_gatt_char(ServiceSCDSettings["SCDGenericCommands"], b'\x20')
 
+async def ToggleStatu():
+    vr = await getSTEResultRead()
+    if (vr)[32] != 0:
+        return 1
+    return 0
 
 async def deleteFlashMemory():
     #print("First SCD Generic Command Erase Flash Value")
@@ -172,13 +150,57 @@ async def getRollingCounter():
 
 async def getSTEResultRead():
     return await client.read_gatt_char(ServiceShortTermExperiment["STEResults"])
-async def getSTEResultNotify():
-    await client.start_notify(ServiceShortTermExperiment["STEResults"], notificationHandlerResult)
-    await asyncio.sleep(10.0)
-    await client.stop_notify(ServiceShortTermExperiment["STEResults"])
 
-async def getSTEResultNotifyWithNoTime():
+async def getSTEResultNotify():
+
+    global sendModBus
+    global accelroVariance
+    counterRasultTime = 0
     await client.start_notify(ServiceShortTermExperiment["STEResults"], notificationHandlerResult)
+    while(counterRasultTime<10):
+        try:
+            await asyncio.sleep(1.0)
+            accelroVariance = []
+            sendModBus = []
+        except:
+            print("Error 1")
+        counterRasultTime +=1
+    await client.stop_notify(ServiceShortTermExperiment["STEResults"])
+    #writeDownload()
+
+async def getSTEResultNotifyWithTime(timeData):
+    global sendModBus
+    global accelroVariance
+    counterRasultTime = 0
+    await client.start_notify(ServiceShortTermExperiment["STEResults"], notificationHandlerResult)
+    while(counterRasultTime<timeData):
+        try:
+            await asyncio.sleep(1.0)
+            accelroVariance = []
+            sendModBus = []
+        except:
+            print("Error 1")
+        counterRasultTime +=1
+    await client.stop_notify(ServiceShortTermExperiment["STEResults"])
+    #writeDownload()
+
+
+async def getSTEResultNotifyNoTime():
+    global sendModBus
+    global accelroVariance
+    counterRasultTime = 0
+    await client.start_notify(ServiceShortTermExperiment["STEResults"], notificationHandlerResult)
+    mainControlArr = secondSettingBlock()
+    while(mainControlArr[15]):
+        try:
+            mainControlArr = secondSettingBlock()
+            await asyncio.sleep(1.0)
+            accelroVariance = []
+            sendModBus = []
+        except:
+            print("Error 1")
+        counterRasultTime +=1
+    await client.stop_notify(ServiceShortTermExperiment["STEResults"])
 
 async def setSensorsEnables(byteArray):
     print("First Enable Sensor Value")
@@ -251,9 +273,6 @@ async def getDataFlowRead(): # Burası SADECE YAZILABİLİRDİR
     return await client.read_gatt_char(ServiceBulkDataTransfer["BulkDataTransferDataFlow"])
     
 
-async def pairDevice():
-    await client.pair()
-
 async def getDataFlowNotify(): # Burası SADECE YAZILABİLİRDİR
  
     await client.start_notify(ServiceBulkDataTransfer["BulkDataTransferDataFlow"] , notification_handler)
@@ -263,6 +282,7 @@ async def getDataFlowNotify(): # Burası SADECE YAZILABİLİRDİR
     second = 0
     while(1 ):
         try:    
+          
             if counterL %10 == 0 :    
                 firsLenght = len(allNotifiy)
                 counterL = 0
@@ -287,7 +307,7 @@ async def getDataFlowStatus(): # Burası SADECE YAZILABİLİRDİR
     return await client.read_gatt_char(ServiceBulkDataTransfer["BulkDataTransferStatus"])
 
 async def startDownload():
-    loop.run_until_complete(connect())
+    await connectWithCheck()
     print("Downloand started")
     await getDataFlowNotify()
     await disconnect()
@@ -298,23 +318,26 @@ async def startDownload():
 ################################################## LOGGING BAŞLAMA VE BİTİRME FONKSİYONLARI ############################
     
 
-async def saveDataInFlash(sensorSelect , recordTime): # kayıt için gerekli olan tek şey , dahili hafıza silme hangi sensörlerin kayıt alıcağı ve ne kadar zaman alacağı yollanır
+async def saveDataInFlash(speed,  recordTime): # kayıt için gerekli olan tek şey , dahili hafıza silme hangi sensörlerin kayıt alıcağı ve ne kadar zaman alacağı yollanır
     # x01 Acceler
     # x02 Magnemeter
     # x04 Light
     # x08 Temperature
     print("Erase started")
     await deleteFlashMemory()
-    await disconnect()
-    time.sleep(9)
-    await connect()
+    await connectWithCheck()
     await stopToggle()
+    await setSensorsEnables(b'\xf0')
+    await setSensorsEnables(b'\x01')
+    await setOutputDataRates(speed[0])
+    await setSensorRawValueToFlash(b'\xf1')
     print("Record started")
-    await (setSensorRawValueToFlash(sensorSelect))
     await startToggle()
     time.sleep(recordTime)
     await stopToggle()
+    print("Record finished")
     await disconnect()
+    await startDownload()
 
 ################################################### GENERAL FUNCTIONS NOT SPECIAL ###########################################
 NameMap = {}
@@ -322,9 +345,6 @@ async def scanDevice():
     devices = await BleakScanner.discover()
     for d in devices:
         NameMap[d.name] = d.address
-    #for i in NameMap.keys():
-        #print("Name : ", i , " Mac : " , NameMap[i])
-
 
 async def getDevice(ble_address):
     device = await BleakScanner.find_device_by_address(ble_address, timeout=5.0)
@@ -342,66 +362,113 @@ async def checkDevice():
     NameMap.clear()
     await scanDevice()
     for i in NameMap.values():
-         
         if i == "18:04:ED:62:5B:B6":
-            print("Buldu")
             return True
-         
     return False
 
 async def connectWithCheck():
     while(True ):
         if await checkDevice():
            break
- 
     await connect()
 
-async def testPeriodic():
-    try:
-        await connect()
-        global allNotifiy
-        allNotifiy= []
-        print("Erase memory")
-        await deleteFlashMemory()
-        await disconnect()
-        await connectWithCheck()
-        await stopToggle()
-        await setSensorsEnables(b'\xf0')
-        await setSensorsEnables(b'\x01')
-        await setOutputDataRates(b'\x00')
-        await setSensorRawValueToFlash(b'\xf1')
-        print("Sensör start recording")
-        await startToggle()
-        startDTime = time.localtime(time.time())
-        time.sleep(5)
-        print("Sensör stop recording")
-        await stopToggle()
-        stopDTime = time.localtime(time.time())
-        print("Total geçen zaman : dakika " ,(stopDTime.tm_min- startDTime.tm_min) , (stopDTime.tm_sec- startDTime.tm_sec))
-        await disconnect()
-        await connectWithCheck()
-        print("Download is starting")
-        await getDataFlowNotify()
-        await disconnect()
-        print("Result Notify Başlıyacak")
-        await startToggle()
-        await getSTEResultNotify()
-        await stopToggle()
-        await startToggle()
-        await disconnect()
-        print("All task is successfully")
-    except:
-        controlF = await checkDevice()
-        if controlF:
+
+
+
+async def periodicTime(recordTime , waitTime , speed):
+    mainControlArr = secondSettingBlock()
+    while(mainControlArr[15]):
+        try:
+            mainControlArr = secondSettingBlock()
+            print("-----star---- Periodt")
+            await connect()
+            #await setModeSelection(True)
+            global allNotifiy
+            allNotifiy= []
+            print("Erase memory")
+            await deleteFlashMemory()
             await disconnect()
-            await testPeriodic()
-        else:
-            print("Cihaz kapandı")
+            await connectWithCheck()
+            await stopToggle()
+            await setSensorsEnables(b'\xf0')
+            await setSensorsEnables(b'\x01')
+            await setOutputDataRates(speed)
+            await setSensorRawValueToFlash(b'\xf1')
+            print("Sensör start recording")
+            await startToggle()
+            time.sleep(recordTime)
+            print("Sensör stop recording")
+            await stopToggle()
+            await disconnect()
+            await connectWithCheck()
+            await startToggle()
+            print("Download is starting")
+            await getDataFlowNotify()
+            await disconnect()
+            await disconnect()
+            print("All task is successfully")
+            time.sleep(waitTime)
+        except Exception as e:
+            #print(e)
+            controlF = await checkDevice()
+            if controlF:
+                if await client.is_connected():
+                    await disconnect()
+                    await testPeriodic()
+                else:
+                    await disconnect()
+                    print("Somethings went wrong ! ")
+                    await testPeriodic()
+            else:
+                print("Device Closed")
+
+
+async def testPeriodic():
+    mainControlArr = secondSettingBlock()
+    while(mainControlArr[15]):
+        try:
+            mainControlArr = secondSettingBlock()
+            print("-----star---- Periodt")
+            await connect()
+            #await setModeSelection(True)
+            global allNotifiy
+            allNotifiy= []
+            print("Erase memory")
+            await deleteFlashMemory()
+            await disconnect()
+            await connectWithCheck()
+            await stopToggle()
+            await setSensorsEnables(b'\xf0')
+            await setSensorsEnables(b'\x01')
+            await setOutputDataRates(b'\x00')
+            await setSensorRawValueToFlash(b'\xf1')
+            print("Sensör start recording")
+            await startToggle()
+            time.sleep(5)
+            print("Sensör stop recording")
+            await stopToggle()
+            await disconnect()
+            await connectWithCheck()
+            await startToggle()
+            print("Download is starting")
+            await getDataFlowNotify()
+            await getSTEResultNotify()
+            await disconnect()
+            print("All task is successfully")
+        except Exception as e:
+            #print(e)
+            controlF = await checkDevice()
+            if controlF:
+                if await client.is_connected():
+                    await disconnect()
+                    await testPeriodic()
+                else:
+                    await disconnect()
+                    print("Somethings went wrong ! ")
+                    await testPeriodic()
+            else:
+                print("Device Closed")
   
-
-
-
-
 loop = asyncio.get_event_loop()
 loop.run_until_complete(scanDevice())
 client = BleakClient("18:04:ED:62:5B:B6") # Adres girilmesi lazım
