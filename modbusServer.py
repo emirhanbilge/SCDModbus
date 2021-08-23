@@ -26,7 +26,7 @@ log = logging.getLogger()
 log.setLevel(logging.CRITICAL)
 
 def updating_writer(a):
-
+    
     context  = a[0]
     register = 3 # mode 3
     slave_id = 0x00
@@ -38,7 +38,7 @@ def updating_writer(a):
     context[slave_id].setValues(register, address, values)
 
 def updating_custom_writer(a,values):
-
+    global Context
     context  = a[0]
     register = 3 # mode 3
     slave_id = 0x00
@@ -47,7 +47,7 @@ def updating_custom_writer(a,values):
     context[slave_id].setValues(register, address, values) # server da ki 16. word adresinden itibaren values dizisini yükle.
 
 def updating_settings1_writer(a,values):
-
+    global Context
     context  = a[0]
     register = 3 # mode 3
     slave_id = 0x00
@@ -56,7 +56,7 @@ def updating_settings1_writer(a,values):
     context[slave_id].setValues(register, address, values) # server da ki 16. word adresinden itibaren values dizisini yükle.
 
 def updating_settings2_writer(a,values):
-
+    global Context
     context  = a[0]
     register = 3 # mode 3
     slave_id = 0x00
@@ -65,7 +65,7 @@ def updating_settings2_writer(a,values):
     context[slave_id].setValues(register, address, values) # server da ki 16. word adresinden itibaren values dizisini yükle.
     
 def readSettings1(a):
-
+    global Context
     context  = a[0]
     register = 3 # mode 3
     slave_id = 0x00
@@ -73,7 +73,7 @@ def readSettings1(a):
     return context[slave_id].getValues(register, 66, 1) # server da ki 16. word adresinden itibaren values dizisini yükle.
 
 def readSettings2(a):
-
+    global Context
     context  = a[0]
     register = 3 # mode 3
     slave_id = 0x00
@@ -84,12 +84,12 @@ def readSettings2(a):
 def run_async_server():
     # Modbus kullanılabilir adress dizisini maple
     store = ModbusSlaveContext(
-        di=ModbusSequentialDataBlock(0, [17]*100),
-        co=ModbusSequentialDataBlock(0, [17]*100),
-        hr=ModbusSequentialDataBlock(0, [17]*100),
-        ir=ModbusSequentialDataBlock(0, [17]*100))
+        di=ModbusSequentialDataBlock(0, [0]*100),
+        co=ModbusSequentialDataBlock(0, [0]*100),
+        hr=ModbusSequentialDataBlock(0, [0]*100),
+        ir=ModbusSequentialDataBlock(0, [0]*100))
     store.register(CustomModbusRequest.function_code, 'cm',
-                   ModbusSequentialDataBlock(0, [17] * 100))
+                   ModbusSequentialDataBlock(0, [0] * 100))
     global Context
     Context = ModbusServerContext(slaves=store, single=True)
     
@@ -101,7 +101,7 @@ def run_async_server():
     identity.ModelName = 'Pymodbus Server'
     identity.MajorMinorRevision = version.short()
 
-    StartTcpServer(Context, identity=identity, address=("192.168.2.18", 5020),
+    StartTcpServer(Context, identity=identity, address=("192.168.2.23", 5020),
                    custom_functions=[CustomModbusRequest])
  
 if __name__ == "__main__":

@@ -10,15 +10,15 @@ import modbusServer as mdbs
 from pymodbus.constants import Endian
 from pymodbus.payload import BinaryPayloadBuilder
 from convertFunctions import s16floatfactor , s32floatfactor 
-from modbusManagement import sendModBus , accelroVariance , writeSTEResultModbus ,secondSettingBlock , writeSTESettingToModbusSettingsFirstAll , writeSTESettingToModbusSettingsSecondAll
+from modbusManagement import sendModBus , accelroVariance , writeSTEResultModbus ,secondSettingBlock , writeSTESettingToModbusSettingsFirstAll , writeSTESettingToModbusSettingsSecondAll 
  
 
 
             
 
 def setStartValuesModbus():
-    writeSTESettingToModbusSettingsFirstAll(0)
-    writeSTESettingToModbusSettingsSecondAll(0)
+    writeSTESettingToModbusSettingsFirstAll([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0])
+    writeSTESettingToModbusSettingsSecondAll([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0])
 
 
 
@@ -235,9 +235,10 @@ async def setSensorsEnables(byteArray):
 
 async def setOutputDataRates(byteArray):
     print("First Enable Sensor Value Data Rate")
-    default = bytearray(await getAllSTEConfig())
+    default = await getAllSTEConfig()
     print(default , " 5. index" , bytearray(default[5]))
-    default[5] = byteArray[0]
+   
+    default[5] = byteArray
     await client.write_gatt_char(ServiceShortTermExperiment["STEConfigurationParameters"],default) 
     print("setOutputDataRates Function set Value Data Rate")
     print(await getOutputDataRates())  
@@ -312,6 +313,9 @@ async def getDataFlowNotify(): # Burası SADECE YAZILABİLİRDİR
 async def getDataFlowStatus(): # Burası SADECE YAZILABİLİRDİR
     return await client.read_gatt_char(ServiceBulkDataTransfer["BulkDataTransferStatus"])
 
+
+
+
 async def startDownload():
     await connectWithCheck()
     print("Downloand started")
@@ -331,6 +335,7 @@ async def saveDataInFlash(speed,  recordTime): # kayıt için gerekli olan tek �
     # x08 Temperature
     print("Erase started")
     await deleteFlashMemory()
+    await disconnect()
     await connectWithCheck()
     await stopToggle()
     await setSensorsEnables(b'\xf0')
@@ -386,7 +391,7 @@ async def periodicTime(recordTime , waitTime , speed):
     while(mainControlArr[15]):
         try:
             mainControlArr = secondSettingBlock()
-            print("-----star---- Periodt")
+            print("-----star---- Periodt 2")
             await connect()
             #await setModeSelection(True)
             global allNotifiy

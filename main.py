@@ -1,6 +1,6 @@
 import sys , time 
 sys.path.append('../')
-from manageSCD import testPeriodic , loop , setStartValuesModbus
+from manageSCD import testPeriodic , loop , setStartValuesModbus , periodicTime , setModeSelection , connect , disconnect
 import automatePairing as a
 import threading
 from modbusServer import run_async_server 
@@ -32,7 +32,10 @@ t2 = threading.Thread(target= run_async_server)
 t2.start()
 
 
-loop.run_until_complete(setStartValuesModbus())
+time.sleep(3)
+loop.run_until_complete(connect())
+loop.run_until_complete(setModeSelection(True))
+loop.run_until_complete(disconnect())
 loop.run_until_complete(mainLoopAPI())
 
 

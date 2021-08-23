@@ -2,7 +2,8 @@ import modbusServer as mdbs
 from pymodbus.constants import Endian
 from pymodbus.payload import BinaryPayloadBuilder
 from convertFunctions  import s16floatfactor , s32floatfactor
-from manageSCD import *
+import manageSCD as mng
+import time
 
 
 sendModBus = []
@@ -40,21 +41,21 @@ def writeSTEResultModbus(data):
     generate_mdbs_values(sendModBus , accelroVariance)
 
 def convertBinary(intNum):
+    print("********************" , intNum)
     binaryArr = []
     while(intNum):
         binaryArr.append(intNum %2 )
-        intNum = intNum / 2 
-
-    return binaryArr[::-1]
+        intNum = int(intNum / 2) 
+    return binaryArr
 
 def convertDecimal(arr):
     lenght= len(arr)
     number = 0
     if lenght  <2 :
-        return -1
+        return number
     else:
         for i in range(lenght):
-            number += arr[i] * 2**i
+            number += int(arr[i]) * 2**i
     return number
 
 def writeSTESettingToModbusSettings1(data):
@@ -86,27 +87,31 @@ def writeSTESettingToModbusSettingsSecondAll(data):
 def firstSettingBlock():
     settingsAll = []
     binVal = convertBinary(mdbs.readSettings1(a=(mdbs.Context,))[0])
-    for i in range(16-len(binVal)):
-        settingsAll.append(0)
-    for i in binVal:
-        settingsAll(i)
-    return settingsAll
-
+    if len(binVal) :
+        for i in binVal:
+            settingsAll.append(i)
+        for i in range(16-len(binVal)):
+            settingsAll.append(0)
+        return settingsAll
+    return [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
 def secondSettingBlock():
     settingsAll = []
     binVal = convertBinary(mdbs.readSettings2(a=(mdbs.Context,))[0])
-    for i in range(16-len(binVal)):
-        settingsAll.append(0)
-    for i in binVal:
-        settingsAll(i)
-    return settingsAll
+    if len(binVal) :
+        for i in binVal:
+            settingsAll.append(i)
+        for i in range(16-len(binVal)):
+            settingsAll.append(0)
+        return settingsAll
 
+    return [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
 def closeCommand():
-    binVal2 = convertBinary(mdbs.readSettings2(a=(mdbs.Context,))[0])
+    binVal2 = firstSettingBlock()
     binVal2[15] = 0
-    writeSTESettingToModbusSettingsSecondAll(convertDecimal(binVal2))
+    writeSTESettingToModbusSettingsSecondAll(binVal2)
 
 async def controlValues():
+    print("Settings 1 Kısmında")
     # Değerlerin sıralanışı MSB olarak söylenmiştir 1. bitten kasıt MSB'dir 
     # 1. bit sensör testi 
     # 2-3 . bit sensör hız ayarı 
@@ -116,46 +121,78 @@ async def controlValues():
     # 15. bit Süreli ya da süresiz yayın için ayarlandı
     # 16. bit STE Result başlatma / durdurma için ayarlandı
     controlArr = firstSettingBlock()
-
+    print("Setting 1 " , controlArr)
     if controlArr[15] == 1:
-        testResult = await selfTest()
-        binVal = convertBinary(mdbs.readSettings1(a=(mdbs.Context,))[0])
+        print("Sensör testinde")
+        try:
+            await mng.connect()
+        except :
+            print("Çoktan bağlı")
+        testResult = await mng.selfTest()
+        binVal = firstSettingBlock()
         binVal[15] = 0 
         binVal[11] = 0 
         binVal[10] = 0
         binVal[10] = 0
-        binVal[9] = testResult
-        writeSTESettingToModbusSettingsFirstAll(convertDecimal(binVal))
+        if testResult == b'\xc0':
+            
+            binVal[9] = 0
+        else:
+            binVal[9] = 1
+        await mng.disconnect()
+        writeSTESettingToModbusSettingsFirstAll((binVal))
         closeCommand()
         # Sensör Tesi Yapacak ve error kısmına varsa hata yazıcak
 
     elif controlArr[12] == 1:
-        await deleteFlashMemory()
-        binVal = convertBinary(mdbs.readSettings1(a=(mdbs.Context,))[0])
+        print("Hafıza silmede")
+        await mng.connect()
+        await mng.deleteFlashMemory()
+        await mng.disconnect()
+        binVal = firstSettingBlock()
         binVal[12] = 0 
-        writeSTESettingToModbusSettingsFirstAll(convertDecimal(binVal))
+        writeSTESettingToModbusSettingsFirstAll(binVal)
         closeCommand()
 
-    elif controlArr[0] == 1:
+    elif controlArr[2] == 1:
+        print("Hız sensörü ayarlanıyor")
         if convertDecimal(controlArr[13:15])<5:
-            await setOutputDataRates(bytearray(convertDecimal(controlArr[13:15])))
+            await mng.connect()
+            speed = controlArr[13:15]
+            speedbyte = b'\x00'
+            if speed[0]== 0 and speed[1] == 1:
+                speedbyte = b'\x01'
+            elif speed[0]== 1 and speed[1] == 0:
+                speedbyte = b'\x02'
+            elif speed[0]== 1 and speed[1] == 1:
+                speedbyte = b'\x03'
+            await mng.setOutputDataRates(speedbyte[0])
+            await mng.disconnect()
             # SCD ye decimal değerin byte versiyonu yollanacak
         else:
-           await setOutputDataRates(bytearray(b'\x00'))
+            await mng.connect()
+            await mng.setOutputDataRates(bytearray(b'\x00'))
+            await mng.disconnect()
 
-        if controlArr[3] == 1: # Süresiz yayın demektir
-            if not await ToggleStatu():
-                await startToggle()
-                await getSTEResultNotifyNoTime
+        if controlArr[2] == 1: # Süresiz yayın demektir
+            print("Sürekli streamde")
+            await mng.connect()
+            if not await mng.ToggleStatu():
+                await mng.startToggle()
+                await mng.getSTEResultNotifyNoTime()
+            await mng.disconnect()
             # Burada yayın başlatılır
         else:
-            binVal = convertBinary(mdbs.readSettings1(a=(mdbs.Context,))[0])
+            print("Süreli Streamde")
+            binVal = firstSettingBlock()
+            await mng.connect()
             if convertDecimal(controlArr[2:7]):
-                await getSTEResultNotifyWithTime(convertDecimal(controlArr[4:8]))
+                await mng.getSTEResultNotifyWithTime(convertDecimal(controlArr[4:8]))
             else:
-                await getSTEResultNotifyWithTime(5)
+                await mng.getSTEResultNotifyWithTime(30)
+            await mng.disconnect()
             binVal[3] = 0
-            writeSTESettingToModbusSettingsFirstAll(convertDecimal(binVal))
+            writeSTESettingToModbusSettingsFirstAll(binVal)
             closeCommand()
     else:
         pass # yayın kapalı periyot çalıştırılır ya da herhangi bir şey yapmayabilir
@@ -164,15 +201,21 @@ async def controlValues():
 
 async def mainLoopAPI():
     mainControlArr = secondSettingBlock()
-
+    writeSTESettingToModbusSettingsSecondAll([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0])
+    writeSTESettingToModbusSettingsFirstAll([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0])
     while(1):
         
-        if mainControlArr[15]: # yönetim modbus tarafında olacak 0 olursa bizim tarafımıza geçecektir
-            if mainControlArr[14]: # kayıt ile ilgili kısım
-                if mainControlArr[13]:# periyodik olacak demektir 
+        mainControlArr = secondSettingBlock()
+        print("Settings 2 bit dizisi " , mainControlArr , " 15. index " , mainControlArr[15] , " son arr " ,mainControlArr[0]) 
+        if mainControlArr[15] ==1: # yönetim modbus tarafında olacak 0 olursa bizim tarafımıza geçecektir
+            print("Modbus Yönetiminde")
+            if mainControlArr[14] ==1: # kayıt ile ilgili kısım
+                print("Kayıt alma kısmında")
+                if mainControlArr[13] == 1:# periyodik olacak demektir
+                    print("Periyodik alınacak")
                     helperSetting = firstSettingBlock()
                     if convertDecimal(mainControlArr[9:13]) and convertDecimal(helperSetting[4:8]): # Periyodik seçilip zaman 0000 yollandıysa eğer test periodic çalışacak
-                        await testPeriodic()
+                        await mng.testPeriodic()
                     else:# bu durumda zaman 0 değildir ve ayarlara bakılacak
                         valDelayTime = convertDecimal(mainControlArr[3:5])
                         delayTimeResult = 0
@@ -182,13 +225,21 @@ async def mainLoopAPI():
                             delayTimeResult = 3600 * convertDecimal(mainControlArr[9:13])
                         else:
                             delayTimeResult = 60* convertDecimal(mainControlArr[9:13])
-                        await periodicTime( bytearray(convertDecimal(helperSetting[4:8])) ,  bytearray(delayTimeResult) , bytearray(convertDecimal(mainControlArr[7:9])) )
+                        #await periodicTime( bytearray(convertDecimal(helperSetting[4:8])) ,  bytearray(delayTimeResult) , bytearray(convertDecimal(mainControlArr[7:9])) )
+                        await mng.periodicTime(b'\x00\x00',  b'\x00\x00' , b'\x00\x00' )
                 else:
+                    print(" kayıt alınıcak ama periyodik değil")
                     if convertDecimal(mainControlArr[10:14]) and convertDecimal(mainControlArr[7:9]<5):# kayıt zamanı 0 yollamadıysa eğer
-                        await saveDataInFlash( bytearray(convertDecimal(mainControlArr[7:9])     ,bytearray(convertDecimal(mainControlArr[9:13])  )))
+                        await mng.connect()
+                        await mng.saveDataInFlash( bytearray(convertDecimal(mainControlArr[7:9])     ,bytearray(convertDecimal(mainControlArr[9:13])  )))
+                        await mng.disconnect()
                     else: # time olarak 0000 girdiyse zamana default 4 saniyelik kayıt alınacak
-                        await saveDataInFlash( b'\x00'     ,bytearray(4)  )
-                downloadVal = await getDataFlowStatus()
+                        await mng.connect()
+                        await mng.saveDataInFlash( b'\x00'     ,4  )
+                        await mng.disconnect()
+                await mng.connect()
+                downloadVal = await mng.getDataFlowStatus()
+                await mng.disconnect()
                 if downloadVal == b'\x00':
                     mainControlArr[6] = 0
                     mainControlArr[5] = 0
@@ -206,6 +257,8 @@ async def mainLoopAPI():
             else:#kayıt yok setting 1 çalışır
                 await controlValues()
         else:
+            #print(mainControlArr)
+            print("Burada")
             time.sleep(1)
         
 
