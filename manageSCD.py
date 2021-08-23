@@ -10,11 +10,17 @@ import modbusServer as mdbs
 from pymodbus.constants import Endian
 from pymodbus.payload import BinaryPayloadBuilder
 from convertFunctions import s16floatfactor , s32floatfactor 
-from modbusManagement import sendModBus , accelroVariance , writeSTEResultModbus ,secondSettingBlock
+from modbusManagement import sendModBus , accelroVariance , writeSTEResultModbus ,secondSettingBlock , writeSTESettingToModbusSettingsFirstAll , writeSTESettingToModbusSettingsSecondAll
  
 
 
             
+
+def setStartValuesModbus():
+    writeSTESettingToModbusSettingsFirstAll(0)
+    writeSTESettingToModbusSettingsSecondAll(0)
+
+
 
 ################################################################################################################ FOR NOTIFY ###############################################################################
 allNotifiy = []

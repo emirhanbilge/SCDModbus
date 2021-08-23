@@ -1,10 +1,10 @@
 import sys , time 
 sys.path.append('../')
-from manageSCD import testPeriodic , loop
+from manageSCD import testPeriodic , loop , setStartValuesModbus
 import automatePairing as a
 import threading
 from modbusServer import run_async_server 
-
+from modbusManagement import mainLoopAPI 
 
 """ Automate Pairing Thread - Start"""
 def automate_pairing():
@@ -30,10 +30,14 @@ count = 1
 
 t2 = threading.Thread(target= run_async_server)
 t2.start()
+
+
+loop.run_until_complete(setStartValuesModbus())
+loop.run_until_complete(mainLoopAPI())
+
+
 while(1):
-    print("Loop sayısı " , count)
-    loop.run_until_complete(testPeriodic())
-    count +=1
+    print("Deneme")
 #testPeriodic
 mainloop.quit()  
 
